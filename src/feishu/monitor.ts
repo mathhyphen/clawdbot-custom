@@ -38,13 +38,13 @@ export function createFeishuHandler(opts: MonitorFeishuOpts): FeishuHttpHandler 
     const incomingPath = url.pathname.replace(/\/$/, "");
     const expectedPath = webhookPath.replace(/\/$/, "");
     
+    console.log(`[Feishu] Incoming request: ${req.method} ${url.pathname} (expected: ${expectedPath})`);
+
     if (incomingPath !== expectedPath) {
       return false;
     }
 
-    // console.log(`[Feishu] Received request on ${incomingPath}`);
-
-    let body = "";
+    console.log(`[Feishu] Path matched, reading body...`);
     try {
       await new Promise<void>((resolve, reject) => {
         req.on("data", (chunk) => (body += chunk));
