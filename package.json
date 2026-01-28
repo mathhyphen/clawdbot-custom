@@ -1,5 +1,5 @@
 {
-  "name": "@mathhyphen/clawdbot",
+  "name": "clawdbot",
   "version": "2026.1.25",
   "description": "Custom Clawdbot with Feishu/WeCom and Startup Optimizations",
   "type": "module",
@@ -10,7 +10,7 @@
     "./plugin-sdk/*": "./dist/plugin-sdk/*"
   },
   "bin": {
-    "math-clawd": "dist/entry.js"
+    "clawdbot": "dist/entry.js"
   },
   "files": [
     "dist/**",
