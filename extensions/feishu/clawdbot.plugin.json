@@ -1,7 +1,7 @@
 {
-  "id": "google-gemini-cli-auth",
-  "providers": [
-    "google-gemini-cli"
+  "id": "feishu",
+  "channels": [
+    "feishu"
   ],
   "configSchema": {
     "type": "object",

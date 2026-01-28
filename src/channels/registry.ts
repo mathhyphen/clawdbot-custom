@@ -12,6 +12,8 @@ export const CHAT_CHANNEL_ORDER = [
   "slack",
   "signal",
   "imessage",
+  "feishu",
+  "wecom",
 ] as const;
 
 export type ChatChannelId = (typeof CHAT_CHANNEL_ORDER)[number];
@@ -97,6 +99,26 @@ const CHAT_CHANNEL_META: Record<ChatChannelId, ChannelMeta> = {
     docsLabel: "imessage",
     blurb: "this is still a work in progress.",
     systemImage: "message.fill",
+  },
+  feishu: {
+    id: "feishu",
+    label: "Feishu",
+    selectionLabel: "Feishu (Bot API)",
+    detailLabel: "Feishu Bot",
+    docsPath: "/channels/feishu",
+    docsLabel: "feishu",
+    blurb: "Lark/Feishu bot for teams.",
+    systemImage: "message",
+  },
+  wecom: {
+    id: "wecom",
+    label: "WeCom",
+    selectionLabel: "WeCom (Bot API)",
+    detailLabel: "WeCom Bot",
+    docsPath: "/channels/wecom",
+    docsLabel: "wecom",
+    blurb: "Enterprise WeChat bot.",
+    systemImage: "message",
   },
 };
 

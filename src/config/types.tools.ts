@@ -332,8 +332,8 @@ export type ToolsConfig = {
     search?: {
       /** Enable web search tool (default: true when API key is present). */
       enabled?: boolean;
-      /** Search provider ("brave" or "perplexity"). */
-      provider?: "brave" | "perplexity";
+      /** Search provider ("brave" or "perplexity" or "google" or "bing"). */
+      provider?: "brave" | "perplexity" | "google" | "bing";
       /** Brave Search API key (optional; defaults to BRAVE_API_KEY env var). */
       apiKey?: string;
       /** Default search results count (1-10). */
@@ -350,6 +350,18 @@ export type ToolsConfig = {
         baseUrl?: string;
         /** Model to use (defaults to "perplexity/sonar-pro"). */
         model?: string;
+      };
+      /** Google Custom Search configuration (used when provider="google"). */
+      google?: {
+        /** Google Custom Search API Key (defaults to GOOGLE_SEARCH_KEY env var). */
+        apiKey?: string;
+        /** Search Engine ID (cx) (defaults to GOOGLE_SEARCH_CX env var). */
+        cx?: string;
+      };
+      /** Bing Search configuration (used when provider="bing"). */
+      bing?: {
+        /** Bing Search API Key (defaults to BING_API_KEY env var). */
+        apiKey?: string;
       };
     };
     fetch?: {

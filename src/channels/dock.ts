@@ -369,6 +369,24 @@ const DOCKS: Record<ChatChannelId, ChannelDock> = {
       },
     },
   },
+  feishu: {
+    id: "feishu",
+    capabilities: {
+      chatTypes: ["direct", "group"],
+      reactions: true,
+      media: true,
+    },
+    outbound: { textChunkLimit: 4000 },
+  },
+  wecom: {
+    id: "wecom",
+    capabilities: {
+      chatTypes: ["direct", "group"],
+      reactions: true,
+      media: true,
+    },
+    outbound: { textChunkLimit: 4000 },
+  },
 };
 
 function buildDockFromPlugin(plugin: ChannelPlugin): ChannelDock {

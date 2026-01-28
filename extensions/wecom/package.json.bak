@@ -1,0 +1,11 @@
+{
+  "name": "@clawdbot/wecom",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "WeCom (Enterprise WeChat) integration for Clawdbot",
+  "clawdbot": {
+    "extensions": [
+      "./index.ts"
+    ]
+  }
+}

@@ -68,6 +68,10 @@ apps/ios/*.mobileprovision
 IDENTITY.md
 USER.md
 .tgz
+my_config.json
+creds.json
+cf_url.log
+*.log
 
 # local tooling
 .serena/

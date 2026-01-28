@@ -17,11 +17,14 @@ import {
   writeCache,
 } from "./web-shared.js";
 
-const SEARCH_PROVIDERS = ["brave", "perplexity"] as const;
+const SEARCH_PROVIDERS = ["brave", "perplexity", "google", "bing"] as const;
 const DEFAULT_SEARCH_COUNT = 5;
 const MAX_SEARCH_COUNT = 10;
 
 const BRAVE_SEARCH_ENDPOINT = "https://api.search.brave.com/res/v1/web/search";
+const GOOGLE_SEARCH_ENDPOINT = "https://www.googleapis.com/customsearch/v1";
+const BING_SEARCH_ENDPOINT = "https://api.bing.microsoft.com/v7.0/search";
+
 const DEFAULT_PERPLEXITY_BASE_URL = "https://openrouter.ai/api/v1";
 const PERPLEXITY_DIRECT_BASE_URL = "https://api.perplexity.ai";
 const DEFAULT_PERPLEXITY_MODEL = "perplexity/sonar-pro";
@@ -48,14 +51,10 @@ const WebSearchSchema = Type.Object({
     }),
   ),
   search_lang: Type.Optional(
-    Type.String({
-      description: "ISO language code for search results (e.g., 'de', 'en', 'fr').",
-    }),
+    Type.String({ description: "ISO language code for search results (e.g., 'de', 'en', 'fr')." }),
   ),
   ui_lang: Type.Optional(
-    Type.String({
-      description: "ISO language code for UI elements.",
-    }),
+    Type.String({ description: "ISO language code for UI elements." }),
   ),
   freshness: Type.Optional(
     Type.String({
@@ -84,20 +83,51 @@ type BraveSearchResponse = {
   };
 };
 
+type GoogleSearchResult = {
+  title?: string;
+  link?: string;
+  snippet?: string;
+  pagemap?: {
+    metatags?: Array<Record<string, string>>;
+  };
+};
+
+type GoogleSearchResponse = {
+  items?: GoogleSearchResult[];
+};
+
+type BingSearchResult = {
+  name?: string;
+  url?: string;
+  snippet?: string;
+  dateLastCrawled?: string;
+};
+
+type BingSearchResponse = {
+  webPages?: {
+    value?: BingSearchResult[];
+  };
+};
+
 type PerplexityConfig = {
   apiKey?: string;
   baseUrl?: string;
   model?: string;
 };
 
+type GoogleConfig = {
+  apiKey?: string;
+  cx?: string;
+};
+
+type BingConfig = {
+  apiKey?: string;
+};
+
 type PerplexityApiKeySource = "config" | "perplexity_env" | "openrouter_env" | "none";
 
 type PerplexitySearchResponse = {
-  choices?: Array<{
-    message?: {
-      content?: string;
-    };
-  }>;
+  choices?: Array<{ message?: { content?: string } }>;
   citations?: string[];
 };
 
@@ -115,7 +145,17 @@ function resolveSearchEnabled(params: { search?: WebSearchConfig; sandboxed?: bo
   return true;
 }
 
-function resolveSearchApiKey(search?: WebSearchConfig): string | undefined {
+function resolveSearchApiKey(search?: WebSearchConfig, provider?: string): string | undefined {
+  if (provider === "google") {
+    const fromConfig = resolveGoogleConfig(search).apiKey;
+    const fromEnv = (process.env.GOOGLE_SEARCH_KEY ?? "").trim();
+    return fromConfig || fromEnv || undefined;
+  }
+  if (provider === "bing") {
+    const fromConfig = resolveBingConfig(search).apiKey;
+    const fromEnv = (process.env.BING_API_KEY ?? "").trim();
+    return fromConfig || fromEnv || undefined;
+  }
   const fromConfig =
     search && "apiKey" in search && typeof search.apiKey === "string" ? search.apiKey.trim() : "";
   const fromEnv = (process.env.BRAVE_API_KEY ?? "").trim();
@@ -131,9 +171,27 @@ function missingSearchKeyPayload(provider: (typeof SEARCH_PROVIDERS)[number]) {
       docs: "https://docs.clawd.bot/tools/web",
     };
   }
+  if (provider === "google") {
+    return {
+      error: "missing_google_api_key",
+      message:
+        "web_search (google) needs an API key and CX. Set GOOGLE_SEARCH_KEY and GOOGLE_SEARCH_CX in the Gateway environment, or configure tools.web.search.google.",
+      docs: "https://docs.clawd.bot/tools/web",
+    };
+  }
+  if (provider === "bing") {
+    return {
+      error: "missing_bing_api_key",
+      message:
+        "web_search (bing) needs an API key. Set BING_API_KEY in the Gateway environment, or configure tools.web.search.bing.apiKey.",
+      docs: "https://docs.clawd.bot/tools/web",
+    };
+  }
   return {
     error: "missing_brave_api_key",
-    message: `web_search needs a Brave Search API key. Run \`${formatCliCommand("clawdbot configure --section web")}\` to store it, or set BRAVE_API_KEY in the Gateway environment.`,
+    message: `web_search needs a Brave Search API key. Run 
+${formatCliCommand("clawdbot configure --section web")}
+ to store it, or set BRAVE_API_KEY in the Gateway environment.`, 
     docs: "https://docs.clawd.bot/tools/web",
   };
 }
@@ -144,6 +202,8 @@ function resolveSearchProvider(search?: WebSearchConfig): (typeof SEARCH_PROVIDE
       ? search.provider.trim().toLowerCase()
       : "";
   if (raw === "perplexity") return "perplexity";
+  if (raw === "google") return "google";
+  if (raw === "bing") return "bing";
   if (raw === "brave") return "brave";
   return "brave";
 }
@@ -153,6 +213,20 @@ function resolvePerplexityConfig(search?: WebSearchConfig): PerplexityConfig {
   const perplexity = "perplexity" in search ? search.perplexity : undefined;
   if (!perplexity || typeof perplexity !== "object") return {};
   return perplexity as PerplexityConfig;
+}
+
+function resolveGoogleConfig(search?: WebSearchConfig): GoogleConfig {
+  if (!search || typeof search !== "object") return {};
+  const google = "google" in search ? search.google : undefined;
+  if (!google || typeof google !== "object") return {};
+  return google as GoogleConfig;
+}
+
+function resolveBingConfig(search?: WebSearchConfig): BingConfig {
+  if (!search || typeof search !== "object") return {};
+  const bing = "bing" in search ? search.bing : undefined;
+  if (!bing || typeof bing !== "object") return {};
+  return bing as BingConfig;
 }
 
 function resolvePerplexityApiKey(perplexity?: PerplexityConfig): {
@@ -306,6 +380,78 @@ async function runPerplexitySearch(params: {
   return { content, citations };
 }
 
+async function runGoogleSearch(params: {
+  query: string;
+  count: number;
+  apiKey: string;
+  cx: string;
+  timeoutSeconds: number;
+}): Promise<Record<string, unknown>> {
+  const url = new URL(GOOGLE_SEARCH_ENDPOINT);
+  url.searchParams.set("q", params.query);
+  url.searchParams.set("key", params.apiKey);
+  url.searchParams.set("cx", params.cx);
+  url.searchParams.set("num", String(params.count));
+
+  const res = await fetch(url.toString(), {
+    method: "GET",
+    headers: { Accept: "application/json" },
+    signal: withTimeout(undefined, params.timeoutSeconds * 1000),
+  });
+
+  if (!res.ok) {
+    const detail = await readResponseText(res);
+    throw new Error(`Google Search API error (${res.status}): ${detail || res.statusText}`);
+  }
+
+  const data = (await res.json()) as GoogleSearchResponse;
+  const results = data.items?.map((item) => ({
+    title: item.title,
+    url: item.link,
+    description: item.snippet,
+    siteName: resolveSiteName(item.link),
+  })) ?? [];
+
+  return { results, count: results.length };
+}
+
+async function runBingSearch(params: {
+  query: string;
+  count: number;
+  apiKey: string;
+  timeoutSeconds: number;
+}): Promise<Record<string, unknown>> {
+  const url = new URL(BING_SEARCH_ENDPOINT);
+  url.searchParams.set("q", params.query);
+  url.searchParams.set("count", String(params.count));
+  url.searchParams.set("responseFilter", "Webpages");
+
+  const res = await fetch(url.toString(), {
+    method: "GET",
+    headers: {
+      "Ocp-Apim-Subscription-Key": params.apiKey,
+      Accept: "application/json",
+    },
+    signal: withTimeout(undefined, params.timeoutSeconds * 1000),
+  });
+
+  if (!res.ok) {
+    const detail = await readResponseText(res);
+    throw new Error(`Bing Search API error (${res.status}): ${detail || res.statusText}`);
+  }
+
+  const data = (await res.json()) as BingSearchResponse;
+  const results = data.webPages?.value?.map((item) => ({
+    title: item.name,
+    url: item.url,
+    description: item.snippet,
+    published: item.dateLastCrawled,
+    siteName: resolveSiteName(item.url),
+  })) ?? [];
+
+  return { results, count: results.length };
+}
+
 async function runWebSearch(params: {
   query: string;
   count: number;
@@ -319,6 +465,7 @@ async function runWebSearch(params: {
   freshness?: string;
   perplexityBaseUrl?: string;
   perplexityModel?: string;
+  googleCx?: string;
 }): Promise<Record<string, unknown>> {
   const cacheKey = normalizeCacheKey(
     params.provider === "brave"
@@ -329,6 +476,7 @@ async function runWebSearch(params: {
   if (cached) return { ...cached.value, cached: true };
 
   const start = Date.now();
+  let resultPayload: Record<string, unknown> = {};
 
   if (params.provider === "perplexity") {
     const { content, citations } = await runPerplexitySearch({
@@ -338,72 +486,95 @@ async function runWebSearch(params: {
       model: params.perplexityModel ?? DEFAULT_PERPLEXITY_MODEL,
       timeoutSeconds: params.timeoutSeconds,
     });
-
-    const payload = {
+    resultPayload = {
       query: params.query,
       provider: params.provider,
       model: params.perplexityModel ?? DEFAULT_PERPLEXITY_MODEL,
-      tookMs: Date.now() - start,
       content,
       citations,
     };
-    writeCache(SEARCH_CACHE, cacheKey, payload, params.cacheTtlMs);
-    return payload;
-  }
+  } else if (params.provider === "google") {
+    if (!params.googleCx) throw new Error("Google Search requires CX (Search Engine ID).");
+    const { results, count } = await runGoogleSearch({
+      query: params.query,
+      count: params.count,
+      apiKey: params.apiKey,
+      cx: params.googleCx,
+      timeoutSeconds: params.timeoutSeconds,
+    });
+    resultPayload = {
+      query: params.query,
+      provider: params.provider,
+      count,
+      results,
+    };
+  } else if (params.provider === "bing") {
+    const { results, count } = await runBingSearch({
+      query: params.query,
+      count: params.count,
+      apiKey: params.apiKey,
+      timeoutSeconds: params.timeoutSeconds,
+    });
+    resultPayload = {
+      query: params.query,
+      provider: params.provider,
+      count,
+      results,
+    };
+  } else if (params.provider === "brave") {
+    const url = new URL(BRAVE_SEARCH_ENDPOINT);
+    url.searchParams.set("q", params.query);
+    url.searchParams.set("count", String(params.count));
+    if (params.country) {
+      url.searchParams.set("country", params.country);
+    }
+    if (params.search_lang) {
+      url.searchParams.set("search_lang", params.search_lang);
+    }
+    if (params.ui_lang) {
+      url.searchParams.set("ui_lang", params.ui_lang);
+    }
+    if (params.freshness) {
+      url.searchParams.set("freshness", params.freshness);
+    }
 
-  if (params.provider !== "brave") {
+    const res = await fetch(url.toString(), {
+      method: "GET",
+      headers: {
+        Accept: "application/json",
+        "X-Subscription-Token": params.apiKey,
+      },
+      signal: withTimeout(undefined, params.timeoutSeconds * 1000),
+    });
+
+    if (!res.ok) {
+      const detail = await readResponseText(res);
+      throw new Error(`Brave Search API error (${res.status}): ${detail || res.statusText}`);
+    }
+
+    const data = (await res.json()) as BraveSearchResponse;
+    const results = Array.isArray(data.web?.results) ? (data.web?.results ?? []) : [];
+    const mapped = results.map((entry) => ({
+      title: entry.title ?? "",
+      url: entry.url ?? "",
+      description: entry.description ?? "",
+      published: entry.age ?? undefined,
+      siteName: resolveSiteName(entry.url ?? ""),
+    }));
+
+    resultPayload = {
+      query: params.query,
+      provider: params.provider,
+      count: mapped.length,
+      results: mapped,
+    };
+  } else {
     throw new Error("Unsupported web search provider.");
   }
 
-  const url = new URL(BRAVE_SEARCH_ENDPOINT);
-  url.searchParams.set("q", params.query);
-  url.searchParams.set("count", String(params.count));
-  if (params.country) {
-    url.searchParams.set("country", params.country);
-  }
-  if (params.search_lang) {
-    url.searchParams.set("search_lang", params.search_lang);
-  }
-  if (params.ui_lang) {
-    url.searchParams.set("ui_lang", params.ui_lang);
-  }
-  if (params.freshness) {
-    url.searchParams.set("freshness", params.freshness);
-  }
-
-  const res = await fetch(url.toString(), {
-    method: "GET",
-    headers: {
-      Accept: "application/json",
-      "X-Subscription-Token": params.apiKey,
-    },
-    signal: withTimeout(undefined, params.timeoutSeconds * 1000),
-  });
-
-  if (!res.ok) {
-    const detail = await readResponseText(res);
-    throw new Error(`Brave Search API error (${res.status}): ${detail || res.statusText}`);
-  }
-
-  const data = (await res.json()) as BraveSearchResponse;
-  const results = Array.isArray(data.web?.results) ? (data.web?.results ?? []) : [];
-  const mapped = results.map((entry) => ({
-    title: entry.title ?? "",
-    url: entry.url ?? "",
-    description: entry.description ?? "",
-    published: entry.age ?? undefined,
-    siteName: resolveSiteName(entry.url ?? ""),
-  }));
-
-  const payload = {
-    query: params.query,
-    provider: params.provider,
-    count: mapped.length,
-    tookMs: Date.now() - start,
-    results: mapped,
-  };
-  writeCache(SEARCH_CACHE, cacheKey, payload, params.cacheTtlMs);
-  return payload;
+  const finalPayload = { ...resultPayload, tookMs: Date.now() - start };
+  writeCache(SEARCH_CACHE, cacheKey, finalPayload, params.cacheTtlMs);
+  return finalPayload;
 }
 
 export function createWebSearchTool(options?: {
@@ -416,10 +587,18 @@ export function createWebSearchTool(options?: {
   const provider = resolveSearchProvider(search);
   const perplexityConfig = resolvePerplexityConfig(search);
 
-  const description =
-    provider === "perplexity"
-      ? "Search the web using Perplexity Sonar (direct or via OpenRouter). Returns AI-synthesized answers with citations from real-time web search."
-      : "Search the web using Brave Search API. Supports region-specific and localized search via country and language parameters. Returns titles, URLs, and snippets for fast research.";
+  let description = "";
+  if (provider === "perplexity") {
+    description =
+      "Search the web using Perplexity Sonar (direct or via OpenRouter). Returns AI-synthesized answers with citations from real-time web search.";
+  } else if (provider === "google") {
+    description = "Search the web using Google Custom Search. Returns titles, URLs, and snippets.";
+  } else if (provider === "bing") {
+    description = "Search the web using Bing Search API. Returns titles, URLs, and snippets.";
+  } else {
+    description =
+      "Search the web using Brave Search API. Supports region-specific and localized search via country and language parameters. Returns titles, URLs, and snippets for fast research.";
+  }
 
   return {
     label: "Web Search",
@@ -430,11 +609,23 @@ export function createWebSearchTool(options?: {
       const perplexityAuth =
         provider === "perplexity" ? resolvePerplexityApiKey(perplexityConfig) : undefined;
       const apiKey =
-        provider === "perplexity" ? perplexityAuth?.apiKey : resolveSearchApiKey(search);
+        provider === "perplexity" ? perplexityAuth?.apiKey : resolveSearchApiKey(search, provider);
 
       if (!apiKey) {
         return jsonResult(missingSearchKeyPayload(provider));
       }
+
+      // Check for Google CX
+      let googleCx: string | undefined;
+      if (provider === "google") {
+        const fromConfig = resolveGoogleConfig(search).cx;
+        const fromEnv = (process.env.GOOGLE_SEARCH_CX ?? "").trim();
+        googleCx = fromConfig || fromEnv;
+        if (!googleCx) {
+          return jsonResult(missingSearchKeyPayload(provider));
+        }
+      }
+
       const params = args as Record<string, unknown>;
       const query = readStringParam(params, "query", { required: true });
       const count =
@@ -476,6 +667,7 @@ export function createWebSearchTool(options?: {
           perplexityAuth?.apiKey,
         ),
         perplexityModel: resolvePerplexityModel(perplexityConfig),
+        googleCx,
       });
       return jsonResult(result);
     },

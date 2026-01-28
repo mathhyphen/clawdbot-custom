@@ -180,9 +180,10 @@ export async function startGatewayServer(
           .join("\n")}`,
       );
     }
+    // Update configSnapshot after migration to avoid re-reading
+    configSnapshot = await readConfigFileSnapshot();
   }
 
-  configSnapshot = await readConfigFileSnapshot();
   if (configSnapshot.exists && !configSnapshot.valid) {
     const issues =
       configSnapshot.issues.length > 0
@@ -204,12 +205,14 @@ export async function startGatewayServer(
           .map((entry) => `- ${entry}`)
           .join("\n")}`,
       );
+      // Use the auto-enabled config directly
+      configSnapshot.config = autoEnable.config;
     } catch (err) {
       log.warn(`gateway: failed to persist plugin auto-enable changes: ${String(err)}`);
     }
   }
 
-  const cfgAtStart = loadConfig();
+  const cfgAtStart = configSnapshot.config;
   const diagnosticsEnabled = isDiagnosticsEnabled(cfgAtStart);
   if (diagnosticsEnabled) {
     startDiagnosticHeartbeat();

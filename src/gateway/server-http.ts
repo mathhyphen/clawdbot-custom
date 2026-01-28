@@ -238,6 +238,7 @@ export function createGatewayHttpServer(opts: {
     try {
       const configSnapshot = loadConfig();
       const trustedProxies = configSnapshot.gateway?.trustedProxies ?? [];
+      
       if (await handleHooksRequest(req, res)) return;
       if (
         await handleToolsInvokeHttpRequest(req, res, {

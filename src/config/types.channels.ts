@@ -6,6 +6,8 @@ import type { SignalConfig } from "./types.signal.js";
 import type { SlackConfig } from "./types.slack.js";
 import type { TelegramConfig } from "./types.telegram.js";
 import type { WhatsAppConfig } from "./types.whatsapp.js";
+import type { FeishuConfig } from "./types.feishu.js";
+import type { WeComConfig } from "./types.wecom.js";
 import type { GroupPolicy } from "./types.base.js";
 
 export type ChannelHeartbeatVisibilityConfig = {
@@ -33,5 +35,7 @@ export type ChannelsConfig = {
   signal?: SignalConfig;
   imessage?: IMessageConfig;
   msteams?: MSTeamsConfig;
+  feishu?: FeishuConfig;
+  wecom?: WeComConfig;
   [key: string]: unknown;
 };

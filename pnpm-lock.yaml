@@ -304,6 +304,8 @@ importers:
 
   extensions/discord: {}
 
+  extensions/feishu: {}
+
   extensions/google-antigravity-auth: {}
 
   extensions/google-gemini-cli-auth: {}
@@ -454,6 +456,8 @@ importers:
       zod:
         specifier: ^4.3.6
         version: 4.3.6
+
+  extensions/wecom: {}
 
   extensions/whatsapp: {}
 
