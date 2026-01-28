@@ -42,9 +42,19 @@ export function createFeishuHandler(opts: MonitorFeishuOpts): FeishuHttpHandler 
       return false;
     }
 
+    // console.log(`[Feishu] Received request on ${incomingPath}`);
+
     let body = "";
-    req.on("data", (chunk) => (body += chunk));
-    await new Promise((resolve) => req.on("end", resolve));
+    try {
+      await new Promise<void>((resolve, reject) => {
+        req.on("data", (chunk) => (body += chunk));
+        req.on("end", resolve);
+        req.on("error", reject);
+      });
+    } catch (err) {
+      runtime.error?.(`[Feishu] Error reading request body: ${String(err)}`);
+      return false;
+    }
 
     if (!body) {
       res.writeHead(400);
@@ -61,6 +71,8 @@ export function createFeishuHandler(opts: MonitorFeishuOpts): FeishuHttpHandler 
         payload = JSON.parse(cipher.decrypt(rawData.encrypt));
       }
       
+      // console.log(`[Feishu] Payload type: ${payload.type || payload.header?.event_type}`);
+
       if (payload.type === "url_verification") {
         res.writeHead(200, { "Content-Type": "application/json" });
         res.end(JSON.stringify({ challenge: payload.challenge }));

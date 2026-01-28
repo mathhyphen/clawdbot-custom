@@ -49,11 +49,19 @@ const feishuPlugin = {
               runtime: opts.runtime,
               abortSignal: opts.abortSignal,
             });
+            
+            // Register the HTTP handler. In Clawdbot plugins, this usually adds it to the global gateway middleware.
             api.registerHttpHandler(handler);
             
+            console.log(`[Feishu Plugin] HTTP handler registered for ${opts.accountId}`);
+
+            // Keep the task alive if an abortSignal is provided
             if (opts.abortSignal) {
               await new Promise<void>((resolve) => {
-                opts.abortSignal.addEventListener("abort", () => resolve(), { once: true });
+                opts.abortSignal.addEventListener("abort", () => {
+                  console.log(`[Feishu Plugin] Account ${opts.accountId} stopping...`);
+                  resolve();
+                }, { once: true });
               });
             }
           }
