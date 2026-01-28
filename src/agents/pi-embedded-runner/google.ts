@@ -9,6 +9,7 @@ import {
   downgradeOpenAIReasoningBlocks,
   isCompactionFailureError,
   isGoogleModelApi,
+  mergeSystemIntoUserTurns,
   sanitizeGoogleTurnOrdering,
   sanitizeSessionMessagesImages,
 } from "../pi-embedded-helpers.js";
@@ -352,6 +353,10 @@ export async function sanitizeSessionHistory(params: {
     isOpenAIResponsesApi && modelChanged
       ? downgradeOpenAIReasoningBlocks(repairedTools)
       : repairedTools;
+
+  const sanitizedSystem = policy.mergeSystemIntoUser
+    ? mergeSystemIntoUserTurns(sanitizedOpenAI)
+    : sanitizedOpenAI;
 
   if (hasSnapshot && (!priorSnapshot || modelChanged)) {
     appendModelSnapshot(params.sessionManager, {

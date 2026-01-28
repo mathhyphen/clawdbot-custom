@@ -45,6 +45,7 @@ export function createFeishuHandler(opts: MonitorFeishuOpts): FeishuHttpHandler 
     }
 
     console.log(`[Feishu] Path matched, reading body...`);
+    let body = "";
     try {
       await new Promise<void>((resolve, reject) => {
         req.on("data", (chunk) => (body += chunk));

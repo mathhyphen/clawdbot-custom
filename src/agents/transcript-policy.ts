@@ -19,6 +19,7 @@ export type TranscriptPolicy = {
   validateGeminiTurns: boolean;
   validateAnthropicTurns: boolean;
   allowSyntheticToolResults: boolean;
+  mergeSystemIntoUser: boolean;
 };
 
 const MISTRAL_MODEL_HINTS = [
@@ -108,5 +109,6 @@ export function resolveTranscriptPolicy(params: {
     validateGeminiTurns: !isOpenAi && isGoogle,
     validateAnthropicTurns: !isOpenAi && isAnthropic,
     allowSyntheticToolResults: !isOpenAi && (isGoogle || isAnthropic),
+    mergeSystemIntoUser: provider === "zhipu",
   };
 }
