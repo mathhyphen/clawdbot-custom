@@ -66,6 +66,7 @@ const findLatestMtime = (dirPath, shouldSkip) => {
 
 const shouldBuild = () => {
   if (env.CLAWDBOT_FORCE_BUILD === "1") return true;
+  if (env.CLAWDBOT_SKIP_BUILD_CHECK === "1") return false;
   const stampMtime = statMtime(buildStampPath);
   if (stampMtime == null) return true;
   if (statMtime(distEntry) == null) return true;

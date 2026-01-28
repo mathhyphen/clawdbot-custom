@@ -162,6 +162,7 @@ function pushDiagnostics(diagnostics: PluginDiagnostic[], append: PluginDiagnost
 }
 
 export function loadClawdbotPlugins(options: PluginLoadOptions = {}): PluginRegistry {
+  const startTotal = Date.now();
   const cfg = options.config ?? {};
   const logger = options.logger ?? defaultLogger();
   const validateOnly = options.mode === "validate";
@@ -189,6 +190,7 @@ export function loadClawdbotPlugins(options: PluginLoadOptions = {}): PluginRegi
     coreGatewayHandlers: options.coreGatewayHandlers as Record<string, GatewayRequestHandler>,
   });
 
+  const startDiscovery = Date.now();
   const discovery = discoverClawdbotPlugins({
     workspaceDir: options.workspaceDir,
     extraPaths: normalized.loadPaths,
@@ -201,7 +203,9 @@ export function loadClawdbotPlugins(options: PluginLoadOptions = {}): PluginRegi
     diagnostics: discovery.diagnostics,
   });
   pushDiagnostics(registry.diagnostics, manifestRegistry.diagnostics);
+  const discoveryElapsed = Date.now() - startDiscovery;
 
+  const startJiti = Date.now();
   const pluginSdkAlias = resolvePluginSdkAlias();
   const jiti = createJiti(import.meta.url, {
     interopDefault: true,
@@ -219,6 +223,7 @@ export function loadClawdbotPlugins(options: PluginLoadOptions = {}): PluginRegi
   let memorySlotMatched = false;
 
   for (const candidate of discovery.candidates) {
+    const startPlugin = Date.now();
     const manifestRecord = manifestByRoot.get(candidate.rootDir);
     if (!manifestRecord) {
       continue;
@@ -426,6 +431,10 @@ export function loadClawdbotPlugins(options: PluginLoadOptions = {}): PluginRegi
         message: `plugin failed during register: ${String(err)}`,
       });
     }
+    const pluginElapsed = Date.now() - startPlugin;
+    if (pluginElapsed > 100) {
+      logger.debug(`[plugins] loaded ${record.id} in ${pluginElapsed}ms`);
+    }
   }
 
   if (typeof memorySlot === "string" && !memorySlotMatched) {
@@ -440,5 +449,11 @@ export function loadClawdbotPlugins(options: PluginLoadOptions = {}): PluginRegi
   }
   setActivePluginRegistry(registry, cacheKey);
   initializeGlobalHookRunner(registry);
+
+  const totalElapsed = Date.now() - startTotal;
+  if (totalElapsed > 500) {
+    logger.info(`[plugins] discovery and loading took ${totalElapsed}ms (discovery=${discoveryElapsed}ms, jiti=${Date.now() - startJiti}ms)`);
+  }
+
   return registry;
 }
