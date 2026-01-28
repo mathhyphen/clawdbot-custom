@@ -1,0 +1,8 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "outDir": "../../dist/extensions/wecom",
+    "rootDir": "."
+  },
+  "include": ["index.ts"]
+}

@@ -1,0 +1,11 @@
+{
+  "name": "@clawdbot/feishu",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Feishu channel integration for Clawdbot",
+  "clawdbot": {
+    "extensions": [
+      "./index.ts"
+    ]
+  }
+}

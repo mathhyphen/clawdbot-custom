@@ -433,7 +433,7 @@ export function loadClawdbotPlugins(options: PluginLoadOptions = {}): PluginRegi
     }
     const pluginElapsed = Date.now() - startPlugin;
     if (pluginElapsed > 100) {
-      logger.debug(`[plugins] loaded ${record.id} in ${pluginElapsed}ms`);
+      logger.debug?.(`[plugins] loaded ${record.id} in ${pluginElapsed}ms`);
     }
   }
 
