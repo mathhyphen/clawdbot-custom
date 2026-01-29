@@ -1,6 +1,6 @@
 {
   "name": "clawdbot-cn",
-  "version": "1.0.0",
+  "version": "2026.1.25",
   "description": "Custom Clawdbot with Feishu/WeCom and Startup Optimizations",
   "type": "module",
   "main": "dist/index.js",
