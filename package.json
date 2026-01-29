@@ -29,7 +29,7 @@
     "git-hooks/**"
   ],
   "scripts": {
-    "prepare": "pnpm exec tsc -p tsconfig.json",
+    "prepare": "tsc -p tsconfig.json",
     "dev": "node scripts/run-node.mjs",
     "postinstall": "node scripts/postinstall.js",
     "prepack": "pnpm build && pnpm ui:build",
