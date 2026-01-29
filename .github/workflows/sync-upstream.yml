@@ -27,29 +27,92 @@ jobs:
           git remote add upstream https://github.com/moltbot/moltbot.git || true
           git fetch upstream
       
+      - name: Create sync branch
+        run: |
+          SYNC_BRANCH="sync-upstream-$(date +%Y%m%d-%H%M%S)"
+          git checkout -b $SYNC_BRANCH
+          echo "SYNC_BRANCH=$SYNC_BRANCH" >> $GITHUB_ENV
+      
       - name: Merge upstream changes
         run: |
-          git checkout main
           git pull origin main
           git merge --no-ff upstream/main || {
             echo "Merge conflict detected, attempting to resolve..."
-            # 这里可以添加自动冲突解决逻辑
-            # 例如，优先保留我们的飞书和智谱集成代码
-            git status
-            # 简单的冲突解决策略：保留我们的配置文件
+            # 自动冲突解决策略：保留我们的国内特色功能
             git checkout --ours src/config/types.feishu.ts src/config/types.wecom.ts || true
             git checkout --ours src/config/zod-schema.providers-feishu.ts src/config/zod-schema.providers-wecom.ts || true
             git checkout --ours src/feishu/ src/wecom/ extensions/feishu/ extensions/wecom/ || true
             git checkout --ours src/agents/models-config.providers.ts || true
+            git checkout --ours README.cn.md config.template.cn.json || true
             git add .
             git commit -m "Resolve merge conflicts with upstream"
           }
       
-      - name: Push changes to origin
+      - name: Push sync branch
         run: |
-          git push origin main
+          git push origin ${{ env.SYNC_BRANCH }}
       
-      - name: Send notification (optional)
+      - name: Create Pull Request
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { SYNC_BRANCH } = process.env;
+            const repo = context.repo;
+            
+            // 创建Pull Request
+            const pr = await github.rest.pulls.create({
+              owner: repo.owner,
+              repo: repo.repo,
+              title: `[Auto] Sync upstream updates - ${new Date().toISOString().split('T')[0]}`,
+              head: SYNC_BRANCH,
+              base: 'main',
+              body: `Automated pull request to sync upstream updates from moltbot/moltbot.
+
+This PR was created by the sync-upstream workflow.`,
+              maintainer_can_modify: true
+            });
+            
+            console.log(`Created PR #${pr.data.number}: ${pr.data.title}`);
+            
+            // 等待几秒钟让PR准备就绪
+            await new Promise(resolve => setTimeout(resolve, 5000));
+            
+            // 自动合并PR（如果没有冲突）
+            try {
+              await github.rest.pulls.merge({
+                owner: repo.owner,
+                repo: repo.repo,
+                pull_number: pr.data.number,
+                merge_method: 'squash'
+              });
+              console.log(`Successfully merged PR #${pr.data.number}`);
+            } catch (error) {
+              console.error(`Failed to merge PR: ${error.message}`);
+              console.log('PR may have conflicts that require manual resolution');
+            }
+      
+      - name: Cleanup sync branch
+        if: success()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { SYNC_BRANCH } = process.env;
+            const repo = context.repo;
+            
+            // 删除远程分支
+            try {
+              await github.rest.git.deleteRef({
+                owner: repo.owner,
+                repo: repo.repo,
+                ref: `heads/${SYNC_BRANCH}`
+              });
+              console.log(`Cleaned up remote branch: ${SYNC_BRANCH}`);
+            } catch (error) {
+              console.error(`Failed to cleanup branch: ${error.message}`);
+            }
+      
+      - name: Send notification
         if: success()
         run: |
           echo "Upstream sync completed successfully!"
+          echo "All changes have been automatically merged to main branch."
