@@ -64,6 +64,18 @@ const QWEN_PORTAL_DEFAULT_COST = {
   cacheWrite: 0,
 };
 
+const ZHIPU_CODE_BASE_URL = "https://open.bigmodel.cn/api/coding/paas/v4";
+const ZHIPU_CODE_MODEL_ID = "code-planning";
+const ZHIPU_CODE_CONTEXT_WINDOW = 100000;
+const ZHIPU_CODE_MAX_TOKENS = 8192;
+const ZHIPU_CODE_COMPAT = { supportsDeveloperRole: false } as const;
+const ZHIPU_CODE_DEFAULT_COST = {
+  input: 0,
+  output: 0,
+  cacheRead: 0,
+  cacheWrite: 0,
+};
+
 const OLLAMA_BASE_URL = "http://127.0.0.1:11434/v1";
 const OLLAMA_API_BASE_URL = "http://127.0.0.1:11434";
 const OLLAMA_DEFAULT_CONTEXT_WINDOW = 128000;
@@ -333,6 +345,25 @@ function buildQwenPortalProvider(): ProviderConfig {
   };
 }
 
+function buildZhipuCodingProvider(): ProviderConfig {
+  return {
+    baseUrl: ZHIPU_CODE_BASE_URL,
+    api: "openai-completions",
+    models: [
+      {
+        id: ZHIPU_CODE_MODEL_ID,
+        name: "GLM Coding Plan",
+        reasoning: true,
+        input: ["text"],
+        cost: ZHIPU_CODE_DEFAULT_COST,
+        contextWindow: ZHIPU_CODE_CONTEXT_WINDOW,
+        maxTokens: ZHIPU_CODE_MAX_TOKENS,
+        compat: ZHIPU_CODE_COMPAT,
+      },
+    ],
+  };
+}
+
 function buildSyntheticProvider(): ProviderConfig {
   return {
     baseUrl: SYNTHETIC_BASE_URL,
@@ -416,6 +447,14 @@ export async function resolveImplicitProviders(params: {
     resolveApiKeyFromProfiles({ provider: "ollama", store: authStore });
   if (ollamaKey) {
     providers.ollama = { ...(await buildOllamaProvider()), apiKey: ollamaKey };
+  }
+
+  // Zhipu provider - add if API key is available
+  const zhipuKey =
+    resolveEnvApiKeyVarName("zhipu") ??
+    resolveApiKeyFromProfiles({ provider: "zhipu", store: authStore });
+  if (zhipuKey) {
+    providers.zhipu = { ...buildZhipuCodingProvider(), apiKey: zhipuKey };
   }
 
   return providers;
