@@ -4,7 +4,7 @@ import {
   getChatChannelMeta,
   type ChannelPlugin,
   type ResolvedAccount,
-} from "clawdbot/plugin-sdk";
+} from "openclaw/plugin-sdk";
 
 import { getFeishuRuntime } from "./runtime.js";
 import { monitorFeishuProvider, sendMessageFeishu } from "./monitor.js";

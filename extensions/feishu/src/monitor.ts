@@ -1,7 +1,7 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import crypto from "node:crypto";
 
-import type { MoltbotConfig } from "clawdbot/plugin-sdk";
+import type { MoltbotConfig } from "openclaw/plugin-sdk";
 import { dispatchReplyWithBufferedBlockDispatcher } from "../../../src/auto-reply/reply/provider-dispatcher.js";
 import { resolveEffectiveMessagesConfig } from "../../../src/agents/identity.js";
 
@@ -162,7 +162,6 @@ export function registerFeishuWebhook(api: any) {
       }
 
       let body = bodyResult.value as any;
-      console.log(`[Feishu Plugin] Received webhook event: ${JSON.stringify(body)}`);
 
       if (body.challenge) {
         res.writeHead(200, { "Content-Type": "application/json" });
@@ -174,7 +173,6 @@ export function registerFeishuWebhook(api: any) {
         const cipher = new FeishuCipher(feishuConfig.encryptKey);
         const decrypted = cipher.decrypt(body.encrypt);
         body = JSON.parse(decrypted);
-        console.log(`[Feishu Plugin] Decrypted webhook event: ${JSON.stringify(body)}`);
       }
 
       if ((body.header && body.header.event_type === "im.message.receive_v1") || (body.event && body.event.type === "im.message.receive_v1")) {
@@ -192,11 +190,6 @@ export function registerFeishuWebhook(api: any) {
         const text = JSON.parse(messageContent).text || "";
         const messageId = message.message_id;
         const chatId = message.chat_id;
-        
-        console.log(`[Feishu Plugin] Sender ID: ${senderId}`);
-        console.log(`[Feishu Plugin] Text: ${text}`);
-        console.log(`[Feishu Plugin] Message ID: ${messageId}, Chat ID: ${chatId}`);
-        console.log(`[Feishu Plugin] Dispatching message to agent...`);
         
         const allowFrom = feishuConfig.allowFrom || ["*"];
         const dmPolicy = feishuConfig.dmPolicy || "pairing";
@@ -233,27 +226,19 @@ export function registerFeishuWebhook(api: any) {
         };
         
         try {
-          console.log(`[Feishu Plugin] Calling dispatchReplyWithBufferedBlockDispatcher...`);
           await dispatchReplyWithBufferedBlockDispatcher({
             ctx: ctxPayload,
             cfg: config,
             dispatcherOptions: {
               responsePrefix: resolveEffectiveMessagesConfig(config, "default").responsePrefix,
               deliver: async (payload, _info) => {
-                console.log(`[Feishu Plugin] Received reply payload: ${JSON.stringify(payload)}`);
                 const replyContent = payload.text || "";
                 if (replyContent && feishuConfig.appId && feishuConfig.appSecret) {
                   try {
-                    console.log(`[Feishu Plugin] Sending reply to ${chatId}: ${replyContent}`);
-                    const result = await sendMessageFeishu(chatId, replyContent, feishuConfig.appId, feishuConfig.appSecret);
-                    console.log(`[Feishu Plugin] Reply sent successfully: ${JSON.stringify(result)}`);
+                    await sendMessageFeishu(chatId, replyContent, feishuConfig.appId, feishuConfig.appSecret);
                   } catch (replyError) {
                     console.error(`[Feishu Plugin] Error sending AI reply: ${replyError.message}`);
                   }
-                } else if (!replyContent) {
-                  console.log(`[Feishu Plugin] No reply content to send`);
-                } else if (!feishuConfig.appId || !feishuConfig.appSecret) {
-                  console.log(`[Feishu Plugin] Missing Feishu appId or appSecret`);
                 }
               },
               onError: (err, info) => {
@@ -261,12 +246,11 @@ export function registerFeishuWebhook(api: any) {
               },
             },
           });
-          console.log(`[Feishu Plugin] dispatchReplyWithBufferedBlockDispatcher finished.`);
           
           res.writeHead(200, { "Content-Type": "application/json" });
           res.end(JSON.stringify({ success: true }));
         } catch (error) {
-          console.error(`[Feishu Plugin] Critical error in dispatcher: ${error.message}\n${error.stack}`);
+          console.error(`[Feishu Plugin] Error processing message: ${error.message}`);
           res.writeHead(500, { "Content-Type": "text/plain" });
           res.end(`Internal Server Error: ${error.message}`);
         }
